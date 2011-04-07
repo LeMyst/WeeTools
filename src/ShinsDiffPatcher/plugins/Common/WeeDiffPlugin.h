@@ -18,12 +18,12 @@
 /*	
 /************************************************************************/
 
-/************************************************************************/
-/* Important:
-/* - All plug-ins have to be compiled in UNICODE!
-/************************************************************************/
+#ifndef WIN32_LEAN_AND_MEAN
+#define WIN32_LEAN_AND_MEAN
+#endif
 
 #include <windows.h>
+#include <CommCtrl.h>
 #include <vector>
 
 // Used in DiffPatcher's MessageBox handler.
@@ -73,6 +73,7 @@ namespace WeePlugin
 	{
 		INT32 iMessage;
 		LPVOID lpData;
+		INT32 iRetCode;
 	}
 	NOTIFYMESSAGE, *LPNOTIFYMESSAGE;
 
@@ -122,10 +123,10 @@ struct DIFFGROUP;
 		DIFFGROUP *lpGroup;
 	};
 
-// Typedefs are easier to maintain after all. :(
-typedef std::vector<DIFFTYPE *> DiffTypeList;
-typedef std::vector<DIFFGROUP *> DiffGroupList;
-typedef std::vector<DIFFITEM *> DiffItemList;
+	// Typedefs are easier to maintain after all. :(
+	typedef std::vector<DIFFTYPE *> DiffTypeList;
+	typedef std::vector<DIFFGROUP *> DiffGroupList;
+	typedef std::vector<DIFFITEM *> DiffItemList;
 
 	typedef struct _DIFFITEMLIST
 	{
@@ -140,13 +141,22 @@ typedef std::vector<DIFFITEM *> DiffItemList;
 #pragma pack(pop)
 
 typedef HMODULE HPLUGIN;
+typedef std::vector<LPTSTR> ColumnNames; // Vector contains a list of column names that will be displayed when the plug-in is being loaded.
 
 // Those are notifications that are sent from the DiffPatcher to inform the plug-in about
 // changes or other stuff.
 enum {
-	NM_EXE_CHANGED,		// Path to input executable has changed. The lpData member contains the LPTSTR.
-	NM_DIFF_CHANGED,	// Path to input diff has changed. The lpData member contains the LPTSTR.
-	NM_OUTPUT_CHANGED	// Path to output executable has changed. The lpData member contains the LPTSTR.
+	
+	// v1.0
+	NM_EXE_CHANGED,			// Path to input executable has changed. The lpData member contains the LPTSTR.
+	NM_DIFF_CHANGED,		// Path to input diff has changed. The lpData member contains the LPTSTR.
+	NM_OUTPUT_CHANGED,		// Path to output executable has changed. The lpData member contains the LPTSTR.
+
+	// v1.1
+	NM_ITEMSELECTED,		// Notifies that an item has been selected. THe lpData member contains a pointer to the DIFFITEM.
+	NM_ITEMDESELECTED,		// Notifies that an item has been deselected. THe lpData member contains a pointer to the DIFFITEM.
+	NM_ITEMPRESELECTED,		// Sent to the plug-in whenever an item is going to be checked. Set iRetCode to a non-zero value to prevent checking.
+	NM_ITEMPREDESELECTED	// Sent to the plug-in whenever an item is going to be checked. Set iRetCode to a non-zero value to prevent unchecking
 };
 
 // Maybe a design mistake.. however, I'm not quite sure if this will change sometime.
@@ -183,6 +193,12 @@ public:
 	// To enable the check box you have to add MB_CHECKBOX to the style parameter.
 	// Use a combination of MB_TYPEMASK and IDCHECKBOX to see if check box was active and what message was returned.
 	virtual INT32 DisplayMessageBox(LPCTSTR lpszCaption, LPCTSTR lpszText, LPCTSTR lpszCheckbox, UINT32 uIcondIndex, INT32 iStyle) = 0;
+
+	/************************************************************************/
+	/* The DiffPatcher was supposed to give as much freedom as possible.
+	/* It may be dangerous to offer such function, however, it's still worth it.
+	/************************************************************************/
+	virtual HWND GetMainHandle() = 0;
 };
 
 /************************************************************************/
@@ -191,10 +207,13 @@ public:
 /* Don't forget to set the IGUI parameter when you deriver from this class
 /* or you won't be able to call DiffPatchers functions!
 /************************************************************************/
+
+/************************************************************************/
+/* Version 1.0
+/************************************************************************/
 class IPlugin
 {
 public:
-
 	// Save the GUI pointer.
 	IPlugin(IGUI *gui)
 	{
@@ -252,6 +271,22 @@ public:
 
 	// Self-explanatory.
 	IGUI *m_gui;
+};
+
+/************************************************************************/
+/* Version 1.1
+/************************************************************************/
+class IPlugin2
+{
+public:
+	// Allows you to skip the check that prevents selection if diffs that are in the same group.
+	virtual bool PreventGroupCollision() = 0;
+
+	// Returns a pointer to a vector which contains a list of column names.
+	virtual ColumnNames *GetColumnNames() = 0;
+
+	// Will be passed from the main loop to ensure that the plug-in is able to return own display names.
+	virtual void GetColumnDispInfo(WeePlugin::DIFFITEM *lpDiffItem, NMLVDISPINFO *lpDispInfo) = 0;
 };
 
 // Each plug-in must export the InitPlugin function.
