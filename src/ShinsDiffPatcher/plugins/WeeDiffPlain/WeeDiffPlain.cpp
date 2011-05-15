@@ -123,7 +123,7 @@ void CRCGenerateTable()
 	}
 }
 
-ULONG CRCCalcBuffer(UCHAR *buffer, ULONG32 uSize)
+ULONG32 CRCCalcBuffer(UCHAR *buffer, ULONG32 uSize)
 {
 	ULONG32 uCRC = 0xFFFFFFFF;
 
@@ -135,7 +135,18 @@ ULONG CRCCalcBuffer(UCHAR *buffer, ULONG32 uSize)
 	}
 
 	// Don't ask me why all diffs have cut down their crc to 8 numbers. :(
-	return (uCRC ^ 0xFFFFFFFF) % 0x05F5E100;
+	return (uCRC ^ 0xFFFFFFFF);
+}
+
+// Thanks to Ai4rei for the information regarding Maldiablo's way to handle CRC values higher than 0x7FFFFFFF. 
+ULONG32 Crc32ToOCrc(ULONG32 uCrc32)
+{
+	if(uCrc32 > 0x7FFFFFFF)
+	{
+		uCrc32 = (~uCrc32) + 1;
+	}
+
+	return uCrc32 % 100000000;
 }
 
 // Simple trim implementation.
@@ -223,17 +234,20 @@ void WeeDiffPlain::Notify(WeePlugin::LPNOTIFYMESSAGE sMessage)
 			_tcsncpy_s(g_szInputDiffPath, (const TCHAR *)sMessage->lpData, _MAX_PATH);
 			ClearAll();
 			
-			INT32 iRetCode = ParseDiffFile(g_szInputDiffPath);
-
-			switch(iRetCode)
+			if(g_szInputDiffPath[0] != TEXT('\0'))
 			{
-			case WeePlugin::E_READ_FILE:
-				m_gui->DisplayMessageBox(GetPluginInfo()->lpszPluginName, TEXT("Failed to read diff file!"), NULL, MBI_ERROR, MB_OK);
-				break;
+				INT32 iRetCode = ParseDiffFile(g_szInputDiffPath);
 
-			case WeePlugin::E_INVALID_FORMAT:
-				m_gui->DisplayMessageBox(GetPluginInfo()->lpszPluginName, TEXT("Invalid diff file format!"), NULL, MBI_ERROR, MB_OK);
-				break;
+				switch(iRetCode)
+				{
+				case WeePlugin::E_READ_FILE:
+					m_gui->DisplayMessageBox(GetPluginInfo()->lpszPluginName, TEXT("Failed to read diff file!"), NULL, MBI_ERROR, MB_OK);
+					break;
+
+				case WeePlugin::E_INVALID_FORMAT:
+					m_gui->DisplayMessageBox(GetPluginInfo()->lpszPluginName, TEXT("Invalid diff file format!"), NULL, MBI_ERROR, MB_OK);
+					break;
+				}
 			}
 		}
 		break;
@@ -303,11 +317,14 @@ INT32 WeeDiffPlain::PatchIt()
 	INT32 iMsgCode = 0;
 	TCHAR szMsg[256];
 
-	ULONG uCRC = CRCCalcBuffer(buffer, stFile.st_size);
+	ULONG32 uCRC = CRCCalcBuffer(buffer, stFile.st_size);
 
-	if(uCRC != m_iOriginalCRC)
+	ULONG32 uDTCRC = uCRC % 100000000; // DiffTeam CRC value
+	ULONG32 uOCRC = Crc32ToOCrc(uCRC); // Maldiablo's CRC value
+
+	if(uOCRC != m_iOriginalCRC && uDTCRC != m_iOriginalCRC)
 	{
-		_stprintf_s(szMsg, TEXT("CRC missmatch: Diff: 0x%X | Exe: 0x%X. Continue anyway?"), m_iOriginalCRC, uCRC);
+		_stprintf_s(szMsg, TEXT("CRC missmatch: Diff: 0x%X | Exe: 0x%X <> 0x%X. Continue anyway?"), m_iOriginalCRC, uDTCRC, uOCRC);
 		iMsgCode = m_gui->DisplayMessageBox(GetPluginInfo()->lpszPluginName, szMsg, NULL, MBI_WARNING, MB_YESNO);
 		if((iMsgCode & MB_TYPEMASK) == IDNO)
 		{
@@ -455,7 +472,7 @@ void WeeDiffPlain::ClearAll()
 			delete[] lpDiffGroup->lpszName;
 			lpDiffGroup->lpszName = NULL;
 		}
-		
+
 		delete lpDiffGroup;
 	}
 
