@@ -1,5 +1,5 @@
 @echo off
-if defined PROCESSOR_ARCHITEW6432 (
+if defined ProgramFiles(x86) (
 	copy WeeThumbnail.dll %SystemRoot%\SysWOW64
 	regsvr32 /s "%SystemRoot%\SysWOW64\WeeThumbnail.dll"
 	@echo Installed to: "%SystemRoot%\SysWOW64"

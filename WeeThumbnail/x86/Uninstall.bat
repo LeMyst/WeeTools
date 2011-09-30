@@ -1,5 +1,5 @@
 @echo off
-if defined PROCESSOR_ARCHITEW6432 (
+if defined ProgramFiles(x86) (
 	regsvr32 /u /s "%SystemRoot%\SysWOW64\WeeThumbnail.dll"
 	del %SystemRoot%\SysWOW64\WeeThumbnail.dll
 	@echo Tried to uninstall from: "%SystemRoot%\SysWOW64"
