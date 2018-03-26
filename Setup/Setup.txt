@@ -1,0 +1,12 @@
+Gravity has released a new Setup.exe on 2011-09-07.
+Still, some may have the problem of not being able to
+see the button at the bottom of the window.
+
+This modified version has a simple size fix until Gravity
+decides to fix it themselves. Basically, it reads the sizes
+from another position without messing up the background images.
+
+If you need other sizes then jump with your favorite hex editor
+to offset 0x15885 for the height value and 0x1588a for the width value
+
+- Shinryo
